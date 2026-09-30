@@ -1,0 +1,67 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Arial, sans-serif; background: #f5f7fb; color: #1f2937; }
+header { background: #0f3d66; color: white; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; }
+header nav { display: flex; gap: 8px; }
+main { max-width: 1200px; margin: 0 auto; padding: 24px; }
+h1, h2, h3 { margin-top: 0; }
+.card { background: white; border: 1px solid #dde3ea; border-radius: 10px; padding: 18px; margin-bottom: 18px; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
+.login-page { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+.login-card { width: 100%; max-width: 380px; }
+form { display: grid; gap: 10px; }
+input, select { width: 100%; padding: 10px; border: 1px solid #c9d2dc; border-radius: 6px; font: inherit; }
+button { border: 0; background: #1463a5; color: white; padding: 9px 13px; border-radius: 6px; cursor: pointer; }
+button:hover { opacity: .9; }
+button.secondary { background: #64748b; }
+button.danger { background: #b42318; }
+.nav-button { background: rgba(255,255,255,.14); }
+.actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.actions input { flex: 1; min-width: 150px; }
+.between { justify-content: space-between; }
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 18px; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.stat { text-align: center; }
+.stat-value { font-size: 32px; font-weight: 700; color: #0f3d66; }
+.muted { color: #667085; }
+.muted-light { color: #d8e5f1; font-size: 14px; }
+.hint { color: #667085; font-size: 13px; }
+.error { color: #b42318; }
+.error-box, .success { padding: 12px 14px; border-radius: 7px; margin-bottom: 16px; }
+.error-box { background: #fee4e2; color: #912018; }
+.success { background: #dcfae6; color: #067647; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e5e7eb; }
+th { background: #f8fafc; }
+@media (max-width: 800px) {
+  .grid-2, .stats { grid-template-columns: 1fr; }
+  header { align-items: flex-start; gap: 10px; flex-direction: column; }
+}
+
+/* Dedicated Loan Module */
+.loan-nav { background: #0b7a55; font-weight: 700; }
+.module-banner { display: flex; justify-content: space-between; align-items: center; gap: 18px; border-left: 5px solid #0b7a55; }
+.module-banner h3, .module-banner p { margin-bottom: 6px; }
+.module-title { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; }
+.module-title h2, .module-title p { margin-bottom: 4px; }
+.module-badge, .status-badge { display: inline-block; border-radius: 999px; padding: 6px 10px; font-size: 13px; font-weight: 700; }
+.module-badge { background: #e7f6ef; color: #075c41; }
+.status-badge { background: #e8f1fb; color: #0f3d66; }
+.loan-rules { border-top: 4px solid #0b7a55; }
+.loan-rules p { line-height: 1.5; }
+@media (max-width: 800px) {
+  .module-banner, .module-title { align-items: flex-start; flex-direction: column; }
+}
+
+/* V3: Admin-created customer login + customer self-service */
+.customer-login-banner { border-left-color: #7c3aed; }
+.login-help { margin-top: 8px; padding: 10px; border-radius: 6px; background: #f8fafc; color: #475467; font-size: 13px; line-height: 1.6; }
+.profile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.profile-grid div { display: grid; gap: 4px; padding: 12px; background: #f8fafc; border-radius: 7px; }
+.profile-grid span { color: #667085; font-size: 13px; }
+.narrow-section { max-width: 600px; margin: 0 auto; }
+.welcome-card { border-left: 5px solid #1463a5; }
+hr { border: 0; border-top: 1px solid #e5e7eb; margin: 18px 0; }
+@media (max-width: 800px) {
+  .profile-grid { grid-template-columns: 1fr; }
+  header nav { flex-wrap: wrap; }
+}
