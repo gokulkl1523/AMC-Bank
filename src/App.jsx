@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 const API = 'http://localhost:8080/api'; // calling Spring Boot Rest API for backend access
-const APP_VERSION = 'v5-customer-transactions';
+const APP_VERSION = 'v6-persistent-transaction-popups';
 
 // Prevent a JWT/role saved by an older project version from being reused.
 if (localStorage.getItem('amc_app_version') !== APP_VERSION) {
@@ -152,6 +152,11 @@ function AdminApplication({ username, role, onLogout }) {
     type: 'HOME', principal: 10000, interestRate: 8, tenureMonths: 12
   });
   const [message, setMessage] = useState('');
+  const [toast, setToast] = useState(null);
+
+  function showToast(title, detail) {
+    setToast({ title, detail });
+  }
 
   useEffect(() => {
     loadDashboard();
@@ -199,6 +204,7 @@ function AdminApplication({ username, role, onLogout }) {
   async function saveCustomer(e) {
     e.preventDefault();
     await run(async () => {
+      const isUpdate = Boolean(editingId);
       if (editingId) {
         const { initialPassword, ...updateData } = customerForm;
         await request(`/customers/${editingId}`, {
@@ -215,9 +221,13 @@ function AdminApplication({ username, role, onLogout }) {
       setCustomerForm(emptyCustomerForm());
       await loadCustomers();
       await loadDashboard();
-      setMessage(editingId
+      const action = isUpdate
         ? 'Customer updated successfully'
-        : 'Customer and login created successfully');
+        : 'Customer and login created successfully';
+      setMessage(action);
+      showToast(action, isUpdate
+        ? 'The customer details are saved and will be available after restarting the app.'
+        : 'The customer profile and login have been saved.');
     });
   }
 
@@ -240,6 +250,7 @@ function AdminApplication({ username, role, onLogout }) {
       await loadCustomers();
       await loadDashboard();
       setMessage('Customer and login deleted');
+      showToast('Customer deleted', 'The customer profile and login have been removed.');
     });
   }
 
@@ -255,25 +266,41 @@ function AdminApplication({ username, role, onLogout }) {
   async function openAccount(e) {
     e.preventDefault();
     await run(async () => {
-      await request(`/customers/${selectedCustomer.id}/accounts`, {
+      const createdAccount = await request(`/customers/${selectedCustomer.id}/accounts`, {
         method: 'POST',
         body: JSON.stringify({ ...accountForm, balance: Number(accountForm.balance) })
       });
       setAccounts(await request(`/customers/${selectedCustomer.id}/accounts`));
       await loadDashboard();
       setMessage('Account opened successfully');
+      showToast('Account opened', `${createdAccount.type} account ${createdAccount.accountNumber} is ready to use.`);
     });
   }
 
   async function money(accountId, operation) {
+    const account = accounts.find(item => item.id === accountId);
     const amount = prompt(`Enter amount to ${operation}:`);
-    if (!amount) return;
+    if (amount === null) return;
+
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      setMessage('Amount must be greater than zero');
+      return;
+    }
+
+    if (operation === 'withdraw' && numericAmount > Number(account?.balance || 0)) {
+      setMessage(`Withdrawal denied. Available balance is ₹${Number(account.balance).toLocaleString()}`);
+      return;
+    }
+
     await run(async () => {
-      await request(`/accounts/${accountId}/${operation}?amount=${encodeURIComponent(amount)}`, {
+      const updatedAccount = await request(`/accounts/${accountId}/${operation}?amount=${encodeURIComponent(amount)}`, {
         method: 'POST'
       });
       setAccounts(await request(`/customers/${selectedCustomer.id}/accounts`));
-      setMessage(`${operation} completed`);
+      const action = operation === 'deposit' ? 'Deposit successful' : 'Withdrawal successful';
+      setMessage(action);
+      showToast(action, `₹${numericAmount.toLocaleString()} • ${updatedAccount.accountNumber} • New balance ₹${Number(updatedAccount.balance).toLocaleString()}`);
     });
   }
 
@@ -300,6 +327,7 @@ function AdminApplication({ username, role, onLogout }) {
       setCustomerLoans(await request(`/customers/${selectedCustomer.id}/loans`));
       await loadDashboard();
       setMessage('Loan sanctioned successfully');
+      showToast('Loan sanctioned', 'The customer loan has been saved successfully.');
     });
   }
 
@@ -311,11 +339,13 @@ function AdminApplication({ username, role, onLogout }) {
       setAllLoans(await request('/loans'));
       await loadDashboard();
       setMessage('Loan sanctioned successfully');
+      showToast('Loan sanctioned', 'The customer loan has been saved successfully.');
     });
   }
 
   return (
     <div>
+      <Toast toast={toast} onClose={() => setToast(null)} />
       <Header username={username} role={role} onLogout={onLogout}>
         <button className="nav-button" onClick={() => { setView('dashboard'); loadDashboard(); }}>Dashboard</button>
         <button className="nav-button" onClick={() => { setView('customers'); loadCustomers(); }}>Customers</button>
@@ -509,11 +539,19 @@ function CustomerApplication({ username, role, onLogout }) {
   const [profile, setProfile] = useState(null);
   const [accounts, setAccounts] = useState([]);
   const [loans, setLoans] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [message, setMessage] = useState('');
+  const [toast, setToast] = useState(null);
+
+  function showToast(title, detail) {
+    setToast({ title, detail });
+  }
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
 
   useEffect(() => {
     loadMyData();
+    loadNotifications();
   }, []);
 
   async function run(action) {
@@ -523,6 +561,28 @@ function CustomerApplication({ username, role, onLogout }) {
     } catch (err) {
       setMessage(err.message);
     }
+  }
+
+  async function loadNotifications() {
+    try {
+      const [notificationData, countData] = await Promise.all([
+        request('/customer/me/notifications'),
+        request('/customer/me/notifications/unread-count')
+      ]);
+      setNotifications(notificationData);
+      setUnreadCount(countData.count);
+    } catch (err) {
+      setMessage(err.message);
+    }
+  }
+
+  async function markAllRead() {
+    await run(async () => {
+      await request('/customer/me/notifications/read-all', { method: 'POST' });
+      await loadNotifications();
+      setMessage('All notifications marked as read');
+      showToast('Notifications updated', 'All saved notifications have been marked as read.');
+    });
   }
 
   async function loadMyData() {
@@ -553,6 +613,7 @@ function CustomerApplication({ username, role, onLogout }) {
       });
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setMessage('Password changed successfully');
+      showToast('Password changed', 'Your new password has been saved. Use it the next time you sign in.');
     });
   }
 
@@ -586,14 +647,20 @@ function CustomerApplication({ username, role, onLogout }) {
     }
 
     await run(async () => {
-      await request(`/customer/me/accounts/${accountId}/${operation}?amount=${encodeURIComponent(input)}`, {
+      const updatedAccount = await request(`/customer/me/accounts/${accountId}/${operation}?amount=${encodeURIComponent(input)}`, {
         method: 'POST'
       });
       const updatedAccounts = await request('/customer/me/accounts');
       setAccounts(updatedAccounts);
-      setMessage(operation === 'deposit'
+      await loadNotifications();
+      const action = operation === 'deposit'
         ? 'Deposit completed successfully'
-        : 'Withdrawal completed successfully');
+        : 'Withdrawal completed successfully';
+      setMessage(action);
+      showToast(
+        operation === 'deposit' ? 'Deposit successful' : 'Withdrawal successful',
+        `₹${amount.toLocaleString()} • ${updatedAccount.accountNumber} • New balance ₹${Number(updatedAccount.balance).toLocaleString()}`
+      );
     });
   }
 
@@ -602,10 +669,21 @@ function CustomerApplication({ username, role, onLogout }) {
 
   return (
     <div>
+      <Toast toast={toast} onClose={() => setToast(null)} />
       <Header username={username} role={role} onLogout={onLogout}>
         <button className="nav-button" onClick={() => setView('dashboard')}>My Dashboard</button>
         <button className="nav-button" onClick={() => setView('accounts')}>My Accounts</button>
         <button className="nav-button loan-nav" onClick={() => setView('loans')}>My Loans</button>
+        <button
+          className="nav-button notification-nav"
+          onClick={() => {
+            loadNotifications();
+            setView('notifications');
+          }}
+        >
+          🔔 Notifications
+          {unreadCount > 0 && <span className="notification-count">{unreadCount}</span>}
+        </button>
         <button className="nav-button" onClick={() => setView('password')}>Change Password</button>
       </Header>
 
@@ -662,6 +740,48 @@ function CustomerApplication({ username, role, onLogout }) {
           </section>
         )}
 
+        {view === 'notifications' && (
+          <section>
+            <div className="notification-header">
+              <div>
+                <h2>🔔 Notifications</h2>
+                <p className="muted">Recent activity and alerts from AMC Bank.</p>
+              </div>
+              {notifications.length > 0 && (
+                <button className="secondary" onClick={markAllRead}>Mark All as Read</button>
+              )}
+            </div>
+
+            <div className="card">
+              {notifications.length === 0 ? (
+                <div className="empty-notifications">
+                  <div className="empty-icon">🔔</div>
+                  <h3>No Notifications</h3>
+                  <p className="muted">Your transaction notifications will appear here.</p>
+                </div>
+              ) : (
+                <div className="notification-list">
+                  {notifications.map(n => (
+                    <div
+                      key={n.id}
+                      className={n.readStatus ? 'notification-item read' : 'notification-item unread'}
+                    >
+                      <div className="notification-icon">{n.type === 'DEPOSIT' ? '💰' : '💸'}</div>
+                      <div className="notification-content">
+                        <strong>{n.type === 'DEPOSIT' ? 'Deposit Alert' : 'Withdrawal Alert'}</strong>
+                        <p>{n.message}</p>
+                        {n.amount != null && <small className="notification-details">Amount: ₹{Number(n.amount).toLocaleString()} · Balance after: ₹{Number(n.balanceAfter).toLocaleString()}</small>}
+                        <small>{new Date(n.createdAt).toLocaleString()}</small>
+                      </div>
+                      {!n.readStatus && <span className="unread-dot"></span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
         {view === 'password' && (
           <section className="narrow-section">
             <h2>Change Password</h2>
@@ -695,8 +815,26 @@ function Header({ username, role, onLogout, children }) {
 
 function Message({ text }) {
   if (!text) return null;
-  const good = text.toLowerCase().includes('success') || text.includes('completed') || text.includes('deleted');
+  const good = text.toLowerCase().includes('success') || text.includes('completed') || text.includes('deleted') || text.includes('marked as read');
   return <div className={good ? 'success' : 'error-box'}>{text}</div>;
+}
+
+function Toast({ toast, onClose }) {
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timeout = window.setTimeout(onClose, 5500);
+    return () => window.clearTimeout(timeout);
+  }, [toast, onClose]);
+
+  if (!toast) return null;
+
+  return (
+    <div className="transaction-toast" role="status" aria-live="polite">
+      <div className="toast-icon">✓</div>
+      <div><strong>{toast.title}</strong><span>{toast.detail}</span></div>
+      <button className="toast-close" aria-label="Close notification" onClick={onClose}>×</button>
+    </div>
+  );
 }
 
 function Stat({ title, value }) {
